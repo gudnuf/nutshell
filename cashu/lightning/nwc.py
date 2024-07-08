@@ -22,6 +22,7 @@ from .base import (
     PaymentStatus,
     StatusResponse,
 )
+from .fx.mempool import MempoolExchangeRateProvider
 
 required_nip47_methods = [
     "get_info",
@@ -41,6 +42,9 @@ class NWCWallet(LightningBackend):
         self.unit = unit
         self.client = NWCClient(nostrWalletConnectUrl=settings.mint_nwc_url)
 
+    async def _amt_to_sat(self, amt: int) -> int:
+        return await self.fx.to_sats(amt, self.unit)
+
     async def status(self) -> StatusResponse:
         try:
             info = await self.client.get_info()
@@ -51,7 +55,8 @@ class NWCWallet(LightningBackend):
                 )
             res = await self.client.get_balance()
             balance_msat = res.balance
-            return StatusResponse(balance=balance_msat // 1000, error_message=None)
+            balance = await self.fx.from_sats(balance_msat // 1000, self.unit)
+            return StatusResponse(balance=balance, error_message=None)
         except Nip47Error as exc:
             return StatusResponse(
                 error_message=str(exc),
@@ -71,8 +76,9 @@ class NWCWallet(LightningBackend):
         unhashed_description: Optional[str] = None,
     ) -> InvoiceResponse:
         try:
+            amount_sat = await self._amt_to_sat(amount.amount)
             res = await self.client.create_invoice(
-                request=Nip47MakeInvoiceRequest(amount=amount.amount * 1000)
+                request=Nip47MakeInvoiceRequest(amount=amount_sat * 1000)
             )
             return InvoiceResponse(
                 checking_id=res.payment_hash,
@@ -101,12 +107,15 @@ class NWCWallet(LightningBackend):
             invoice = await self.client.lookup_invoice(
                 Nip47LookupInvoiceRequest(payment_hash=quote.checking_id)
             )
-            fees = invoice.fees_paid
+            fees = invoice.fees_paid * 1000
+
+            if fees > 0:
+                fees = await self.fx.from_sats(fees, self.unit)
 
             return PaymentResponse(
                 ok=True,
                 checking_id=None,
-                fee=Amount(unit=Unit.msat, amount=fees),
+                fee=Amount(unit=self.unit, amount=fees),
                 preimage=pay_invoice_res.preimage,
             )
         except Nip47Error as exc:
@@ -163,7 +172,11 @@ class NWCWallet(LightningBackend):
         fees_msat = fee_reserve(amount_msat)
         fees = Amount(unit=Unit.msat, amount=fees_msat)
 
-        amount = Amount(unit=Unit.msat, amount=amount_msat)
+        amount_unit = await self.fx.from_sats(amount_msat // 1000, self.unit)
+        fees_unit = await self.fx.from_sats(fees_msat // 1000, self.unit)
+
+        amount = Amount(unit=self.unit, amount=amount_unit)
+        fees = Amount(unit=self.unit, amount=fees_unit)
 
         return PaymentQuoteResponse(
             checking_id=invoice_obj.payment_hash,
