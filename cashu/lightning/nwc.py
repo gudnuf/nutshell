@@ -33,8 +33,7 @@ required_nip47_methods = [
 
 
 class NWCWallet(LightningBackend):
-
-    supported_units = {Unit.sat}
+    supported_units = {Unit.sat, Unit.usd}
 
     def __init__(self, unit: Unit, **kwargs):
         logger.debug(f"Initializing NWCWallet with unit: {unit}")
