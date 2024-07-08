@@ -1,6 +1,6 @@
 import math
 import time
-from typing import Optional, Dict
+from typing import Dict, Optional
 
 import httpx
 from pydantic import BaseModel
@@ -74,11 +74,12 @@ class MempoolExchangeRateProvider(ExchangeRateProvider):
     async def from_sats(self, sats: int, unit: Unit) -> int:
         rate = await self.fetch_unit_per_satoshi(unit)
         if unit == Unit.usd:
-            return math.ceil(sats * rate)
+            # round to nearest
+            return round(sats * rate)
         return sats
 
     async def to_sats(self, amount: int, unit: Unit) -> int:
         rate = await self.fetch_unit_per_satoshi(unit)
         if unit == Unit.usd:
-            return math.ceil(amount / rate)
+            return round(amount / rate)
         return amount
