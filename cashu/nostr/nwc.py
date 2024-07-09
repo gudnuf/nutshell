@@ -221,6 +221,14 @@ class NWCClient(NostrClient):
                 )
             return valid
 
+        if request.invoice is None and request.payment_hash is None:
+            raise ValueError("Either 'invoice' or 'payment_hash' must be provided")
+
+        if request.invoice is None:
+            del request.invoice
+        if request.payment_hash is None:
+            del request.payment_hash
+
         res = await self.execute_nip47_request(
             Nip47Method.lookup_invoice, request.dict(), result_validator
         )
