@@ -109,7 +109,7 @@ class NWCWallet(LightningBackend):
                 invoice = await self.client.lookup_invoice(
                     Nip47LookupInvoiceRequest(payment_hash=quote.checking_id)
                 )
-                fees = invoice.fees_paid * 1000
+                fees = invoice.fees_paid // 1000
             except Exception as exc:
                 fees = 0
                 logger.warning(
