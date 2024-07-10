@@ -360,7 +360,7 @@ class NWCClient(NostrClient):
         self.relay_manager.publish_message(request_json)
 
         # wait for and handle response
-        res = await asyncio.wait_for(response_future, timeout=10)
+        res = await asyncio.wait_for(response_future, timeout=60)
         if not result_validator(res.result()):
             raise Exception("Invalid NWC response")
         return res.result()
