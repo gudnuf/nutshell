@@ -105,10 +105,16 @@ class NWCWallet(LightningBackend):
             pay_invoice_res = await self.client.pay_invoice(
                 Nip47PayInvoiceRequest(invoice=quote.request)
             )
-            invoice = await self.client.lookup_invoice(
-                Nip47LookupInvoiceRequest(payment_hash=quote.checking_id)
-            )
-            fees = invoice.fees_paid * 1000
+            try:
+                invoice = await self.client.lookup_invoice(
+                    Nip47LookupInvoiceRequest(payment_hash=quote.checking_id)
+                )
+                fees = invoice.fees_paid * 1000
+            except Exception as exc:
+                fees = 0
+                logger.warning(
+                    f"Failed to get fees, setting to zero for checking_id{quote.checking_id}: {exc}"
+                )
 
             if fees > 0:
                 fees = await self.fx.from_sats(fees, self.unit)
